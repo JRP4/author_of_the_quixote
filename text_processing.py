@@ -21,7 +21,15 @@ def quixote_data_cleaning():
     text = re.sub(pattern, ' ', text)
     return text
 
-#For training you'll need a dataset of (input, label) pairs. Where input and label are sequences. At each time step the input is the current character and the label is the next character.
+def quixote_traintest_split(text):
+    # splits off the end of the novel. Test_data is the final chapter "CHAPTER LXXIV. OF HOW DON QUIXOTE FELL SICK, AND OF THE WILL HE MADE, AND HOW HE DIED"
+    split_character=2165388
+    train_data,test_data=text[:split_character],text[split_character:]
+    
+    return train_data,test_data
+
+#For training you'll need a dataset of (input, label) pairs. Where input and label are sequences. At each time step the input 
+#is the current character and the label is the next character.
 
 #Here's a function that takes a sequence as input, duplicates, and shifts it to align the input and label for each timestep:
 def split_input_target(sequence):
@@ -63,4 +71,30 @@ def text_processing(text,sequence_length,BATCH_SIZE,BUFFER_SIZE):
         .prefetch(tf.data.experimental.AUTOTUNE))
 
     return dataset,ids_from_chars, chars_from_ids, vocab_size
+
+def validation_text_processing(valid_text,sequence_length,BATCH_SIZE,BUFFER_SIZE,ids_from_chars):
+    #Similar to above function but has been modified for when the mapping between ids and characters has to be specified.
+
+    #transforms the text into an array of unicode characters and then into ids.
+    all_ids = ids_from_chars(tf.strings.unicode_split(valid_text, 'UTF-8'))
+
+    ids_dataset = tf.data.Dataset.from_tensor_slices(all_ids)
+
+    # The batch method lets you easily convert these individual characters to sequences of the desired size.
+    sequences = ids_dataset.batch(sequence_length+1, drop_remainder=True) 
+    
+    dataset = sequences.map(split_input_target)
+    
+    # Buffer size to shuffle the dataset
+    # (TF data is designed to work with possibly infinite sequences,
+    # so it doesn't attempt to shuffle the entire sequence in memory. Instead,
+    # it maintains a buffer in which it shuffles elements).
+    dataset = (
+        dataset
+        .shuffle(BUFFER_SIZE)
+        .batch(BATCH_SIZE, drop_remainder=True)
+        .prefetch(tf.data.experimental.AUTOTUNE))
+
+    return dataset
+
 

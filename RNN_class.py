@@ -3,18 +3,27 @@ import numpy as np
 import os
 import re
 
-def Basic_RNN(hidden_units, vocab_size,embedding_dim,learning_rate):
+def Basic_RNN(hidden_units, vocab_size,embedding_dim,learning_rate=2e-3):
+    #single RNN layer model and early stopping. Uses the Adam optimiser.
     model = tf.keras.models.Sequential()
     model.add(tf.keras.layers.Embedding(input_dim=vocab_size, output_dim=embedding_dim))
     model.add(tf.keras.layers.SimpleRNN(hidden_units, activation='tanh',return_sequences=True))
     model.add(tf.keras.layers.Dense(vocab_size))
 
     loss = tf.losses.SparseCategoricalCrossentropy(from_logits=True)
-    optimiser = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+    optimiser = tf.keras.optimizers.Adam(learning_rate=learning_rate,clipvalue=5)
     model.compile(loss=loss, optimizer=optimiser, metrics=['accuracy'])
+
+    model.early_stopping = tf.keras.callbacks.EarlyStopping(
+      monitor='val_loss',    # metric to monitor
+      patience=5,            # number of epochs with no improvement after which training will be stopped
+      verbose=1,             # verbosity mode
+      restore_best_weights=True  # restore model weights from the epoch with the best value of the monitored quantity
+      ) 
     return model
 
 def Basic_RNN_v2(hidden_units, vocab_size,embedding_dim,dropout_rate=0.0,recurrent_dropout_rate=0.0,learning_rate=2e-3):
+    #model with 3 RNN layers. Has early stopping and the option for dropout (both standard and recurrent)
     model = tf.keras.models.Sequential()
     model.add(tf.keras.layers.Embedding(input_dim=vocab_size, output_dim=embedding_dim))
     model.add(tf.keras.layers.SimpleRNN(hidden_units, activation='tanh',return_sequences=True,
@@ -28,25 +37,21 @@ def Basic_RNN_v2(hidden_units, vocab_size,embedding_dim,dropout_rate=0.0,recurre
     loss = tf.losses.SparseCategoricalCrossentropy(from_logits=True)
     optimiser = tf.keras.optimizers.Adam(learning_rate=learning_rate,clipvalue=5)
     model.compile(loss=loss, optimizer=optimiser, metrics=['accuracy'])
+
+    model.early_stopping = tf.keras.callbacks.EarlyStopping(
+      monitor='val_loss',    # metric to monitor
+      patience=5,            # number of epochs with no improvement after which training will be stopped
+      verbose=1,             # verbosity mode
+      restore_best_weights=True  # restore model weights from the epoch with the best value of the monitored quantity
+      ) 
+
     return model
 
 def GRU_RNN(hidden_units, vocab_size,embedding_dim,learning_rate=2e-3):
     model = tf.keras.models.Sequential()
     model.add(tf.keras.layers.Embedding(input_dim=vocab_size, output_dim=embedding_dim))
     model.add(tf.keras.layers.GRU(hidden_units, activation='tanh',return_sequences=True))
-    model.add(tf.keras.layersGRU(hidden_units, activation='tanh',return_sequences=True))
-    model.add(tf.keras.layers.Dense(vocab_size))
-
-    loss = tf.losses.SparseCategoricalCrossentropy(from_logits=True)
-    optimiser = tf.keras.optimizers.Adam(learning_rate=learning_rate)
-    model.compile(loss=loss, optimizer=optimiser, metrics=['accuracy'])
-    return model
-
-def LSTM_RNN(hidden_units, vocab_size,embedding_dim,learning_rate=2e-3):
-    model = tf.keras.models.Sequential()
-    model.add(tf.keras.layersEmbedding(input_dim=vocab_size, output_dim=embedding_dim))
-    model.add(tf.keras.layers.LSTM(hidden_units, activation='tanh',return_sequences=True))
-    model.add(tf.keras.layers.LSTM(hidden_units, activation='tanh',return_sequences=True))
+    model.add(tf.keras.layers.GRU(hidden_units, activation='tanh',return_sequences=True))
     model.add(tf.keras.layers.Dense(vocab_size))
 
     loss = tf.losses.SparseCategoricalCrossentropy(from_logits=True)
@@ -82,3 +87,18 @@ class OneStep(tf.keras.Model):
 
     # Return the characters and model state.
     return predicted_chars
+  
+  def generate_more_steps(self, num_chars, text):
+    #function for generating a pre-specified number of consecutive characters
+    next_char = tf.constant([text])
+    result = [next_char]
+
+    # repeatedly generate characters
+    for n in range(num_chars):
+      next_char = self.generate_one_step(next_char)
+      result.append(next_char)
+    
+    #combine into a single string
+    result = tf.strings.join(result)
+
+    return result
